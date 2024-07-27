@@ -56,7 +56,7 @@ async function main(epoch, user) {
     console.log(`Transaction Hash: ${event.transactionHash}`);
     console.log("-------------------------------------------");
     lastDepositBlock = event.blockNumber;
-    TotalDepositedAmount = event.args.amount;
+    TotalDepositedAmount += event.args.amount;
   });
 
   let WithdrawEventFilter = UniV2Staking.filters.Withdraw(user);
@@ -77,7 +77,7 @@ async function main(epoch, user) {
     console.log(`Transaction Hash: ${eventWithdraw.transactionHash}`);
     console.log("-------------------------------------------");
     if (eventWithdraw.blockNumber >= lastDepositBlock) {
-      TotalDepositedAmount = TotalDepositedAmount - eventWithdraw.args.amount;
+      TotalDepositedAmount -= eventWithdraw.args.amount;
     }
   });
 
