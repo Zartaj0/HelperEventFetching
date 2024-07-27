@@ -1,4 +1,4 @@
-Contains twi scripts
+Contains two scripts
 
 1. **FetchPushStake.js** - To fetch stake events in the core contract for Push Tokens in  a particular epcoch 
 
