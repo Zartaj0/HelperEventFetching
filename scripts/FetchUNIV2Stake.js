@@ -3,25 +3,25 @@ require("dotenv").config();
 
 const abi = [
   "event Deposit(address indexed user, address indexed tokenAddress, uint256 amount)",
-  "event Withdraw(address indexed user, address indexed tokenAddress, uint256 amount)"
+  "event Withdraw(address indexed user, address indexed tokenAddress, uint256 amount)",
 ];
 
 const uniV2StakingAddress = "0x9D2513F5b539DC774C66b28ACEc94e4bD00105C2";
-const userAddress = "0xD66f2F1d86C0c5477aA1612cA92f03297A5477B0";//Dynamic Value from frontend
+const userAddress = "0x6417Ef5291AEB0df83b31555Dc449d172bcc988A"; //Dynamic Value from frontend
 
 const epochStart = 1689085800;
 const epochDuration = 1814400;
 let latestBlock;
 
-async function main() {
+async function main(epoch, user) {
   const provider = ethers.provider;
   latestBlock = await provider.getBlock("latest");
 
   let fromTimestamp;
   let toTimestamp;
-  [fromTimestamp, toTimestamp] = getFromTimestamp(17); 
+  [fromTimestamp, toTimestamp] = getFromTimestamp(epoch);
 
-  fromTimestamp = epochStart;//For testing only
+  // fromTimestamp = epochStart;//For testing from the very start
 
   const fromBlock = await getBlockNumberFromTimestamp(fromTimestamp, provider);
   const toBlock = await getBlockNumberFromTimestamp(toTimestamp, provider);
@@ -35,12 +35,18 @@ async function main() {
     toTimestamp
   );
 
+  let lastDepositBlock;
+  let TotalDepositedAmount = 0;
   // Create the filter for the specific user address to fetch the Deposit Events
-  let depositEventFilter = UniV2Staking.filters.Deposit(userAddress);
-  let depositEvents = await UniV2Staking.queryFilter(depositEventFilter, fromBlock, toBlock);
+  let depositEventFilter = UniV2Staking.filters.Deposit(user);
+  let depositEvents = await UniV2Staking.queryFilter(
+    depositEventFilter,
+    fromBlock,
+    toBlock
+  );
 
   console.log(
-    `Total ${depositEvents.length} Deposit events found for user ${userAddress} between blocks ${fromBlock} and ${toBlock}`
+    `Total ${depositEvents.length} Deposit events found for user ${user} between blocks ${fromBlock} and ${toBlock}`
   );
   depositEvents.forEach((event, index) => {
     console.log(`Event ${index + 1}:`);
@@ -49,22 +55,33 @@ async function main() {
     console.log(`Block Number: ${event.blockNumber}`);
     console.log(`Transaction Hash: ${event.transactionHash}`);
     console.log("-------------------------------------------");
+    lastDepositBlock = event.blockNumber;
+    TotalDepositedAmount = event.args.amount;
   });
 
-  let WithdrawEventFilter = UniV2Staking.filters.Withdraw(userAddress);
-  let withdrawEvents = await UniV2Staking.queryFilter(WithdrawEventFilter, fromBlock, toBlock);
+  let WithdrawEventFilter = UniV2Staking.filters.Withdraw(user);
+  let withdrawEvents = await UniV2Staking.queryFilter(
+    WithdrawEventFilter,
+    fromBlock,
+    toBlock
+  );
 
   console.log(
-    `Total ${withdrawEvents.length} Withdraw events found for user ${userAddress} between blocks ${fromBlock} and ${toBlock}`
+    `Total ${withdrawEvents.length} Withdraw events found for user ${user} between blocks ${fromBlock} and ${toBlock}`
   );
-  withdrawEvents.forEach((event, index) => {
+  withdrawEvents.forEach((eventWithdraw, index) => {
     console.log(`Event ${index + 1}:`);
-    console.log(`User: ${event.args.user}`);
-    console.log(`Amount Staked: ${event.args.amount.toString()}`);
-    console.log(`Block Number: ${event.blockNumber}`);
-    console.log(`Transaction Hash: ${event.transactionHash}`);
+    console.log(`User: ${eventWithdraw.args.user}`);
+    console.log(`Amount Staked: ${eventWithdraw.args.amount.toString()}`);
+    console.log(`Block Number: ${eventWithdraw.blockNumber}`);
+    console.log(`Transaction Hash: ${eventWithdraw.transactionHash}`);
     console.log("-------------------------------------------");
+    if (eventWithdraw.blockNumber >= lastDepositBlock) {
+      TotalDepositedAmount = TotalDepositedAmount - eventWithdraw.args.amount;
+    }
   });
+
+  console.log("Total Amount Staked this epoch", TotalDepositedAmount);
 }
 
 function getFromTimestamp(epoch) {
@@ -102,7 +119,7 @@ async function getBlockNumberFromTimestamp(timestamp, provider) {
   // Return the closest block number that is less than or equal to the given timestamp
   return low - 1;
 }
-main()
+main(18, userAddress)
   .then(() => process.exit(0))
   .catch((error) => {
     console.error(error);
