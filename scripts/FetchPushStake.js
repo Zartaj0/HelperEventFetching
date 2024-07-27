@@ -5,7 +5,7 @@ const abi = [
   "event Staked(address indexed user, uint256 indexed amountStaked)",
 ];
 
-const comm = "0x66329Fdd4042928BfCAB60b179e1538D56eeeeeE";
+const core = "0x66329Fdd4042928BfCAB60b179e1538D56eeeeeE";
 const userAddress = "0x5e2D6e828683Fe785531b21F4DAD96236c1040c2";
 const genesisBlock = 17821509;
 const epochDuration = 150276; 
@@ -17,12 +17,12 @@ async function main() {
   toBlock = getToBlock(18); // to fetch between a specific period 
   // toBlock = await ethers.provider.getBlockNumber(); // to fetch events till the latest block
 
-  let Comm = new ethers.Contract(comm, abi, ethers.provider);
+  let Core = new ethers.Contract(core, abi, ethers.provider);
   console.log("Fetching Staked events from core");
 
   // Create the filter for the specific user address
-  let eventFilter = Comm.filters.Staked(userAddress);
-  let events = await Comm.queryFilter(eventFilter, fromBlock, toBlock);
+  let eventFilter = Core.filters.Staked(userAddress);
+  let events = await Core.queryFilter(eventFilter, fromBlock, toBlock);
 
   console.log(
     `Total ${events.length} events found for user ${userAddress} between blocks ${fromBlock} and ${toBlock}`
