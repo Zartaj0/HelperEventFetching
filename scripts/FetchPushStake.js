@@ -9,10 +9,11 @@ const core = "0x66329Fdd4042928BfCAB60b179e1538D56eeeeeE";
 const userAddress = "0x5e2D6e828683Fe785531b21F4DAD96236c1040c2";
 const genesisBlock = 17821509;
 const epochDuration = 150276; 
-let fromBlock ; // specify the starting block number
-let toBlock; // specify the ending block number
-
+let fromBlock ; 
+let toBlock; 
 async function main() {
+
+  //pass the current epoch here
   fromBlock = getFromBlock(18); 
   toBlock = getToBlock(18); // to fetch between a specific period 
   // toBlock = await ethers.provider.getBlockNumber(); // to fetch events till the latest block
