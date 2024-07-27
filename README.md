@@ -1,13 +1,13 @@
-# Sample Hardhat Project
+Contains two scripts
 
-This project demonstrates a basic Hardhat use case. It comes with a sample contract, a test for that contract, and a script that deploys that contract.
+1. **FetchPushStake.js** - To fetch stake events in the core contract for Push Tokens in  a particular epcoch 
 
-Try running some of the following tasks:
+  To run:
+  
+`npx hardhat run .\scripts\FetchPushStake.js --network mainnet`
 
-```shell
-npx hardhat help
-npx hardhat test
-REPORT_GAS=true npx hardhat test
-npx hardhat node
-npx hardhat run scripts/deploy.js
-```
+2. **FetchUNIV2Stake.js** - To fetch Deposit and withdraw events from UniV2 LP tokens staking contract. Fetching both events because it allows users to wihdraw in same epoch. 
+
+To run:
+
+`npx hardhat run .\scripts\FetchUNIV2Stake.js --network mainnet`
