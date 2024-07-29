@@ -19,7 +19,7 @@ async function main(epoch, user) {
 
   let fromTimestamp;
   let toTimestamp;
-  [fromTimestamp, toTimestamp] = getFromTimestamp(epoch);
+  [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
 
   // fromTimestamp = epochStart;//For testing from the very start
 
@@ -35,9 +35,10 @@ async function main(epoch, user) {
     toTimestamp
   );
 
-  let lastDepositBlock;
-  let TotalDepositedAmount = 0;
-  // Create the filter for the specific user address to fetch the Deposit Events
+  let TotalDepositedAmount = BigInt(0); // Initialize as BigInt
+  let events = [];
+
+  // Fetch Deposit events
   let depositEventFilter = UniV2Staking.filters.Deposit(user);
   let depositEvents = await UniV2Staking.queryFilter(
     depositEventFilter,
@@ -45,20 +46,16 @@ async function main(epoch, user) {
     toBlock
   );
 
-  console.log(
-    `Total ${depositEvents.length} Deposit events found for user ${user} between blocks ${fromBlock} and ${toBlock}`
-  );
-  depositEvents.forEach((event, index) => {
-    console.log(`Event ${index + 1}:`);
-    console.log(`User: ${event.args.user}`);
-    console.log(`Amount Staked: ${event.args.amount.toString()}`);
-    console.log(`Block Number: ${event.blockNumber}`);
-    console.log(`Transaction Hash: ${event.transactionHash}`);
-    console.log("-------------------------------------------");
-    lastDepositBlock = event.blockNumber;
-    TotalDepositedAmount += event.args.amount;
+  depositEvents.forEach((event) => {
+    events.push({
+      type: "Deposit",
+      amount: event.args.amount,
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+    });
   });
 
+  // Fetch Withdraw events
   let WithdrawEventFilter = UniV2Staking.filters.Withdraw(user);
   let withdrawEvents = await UniV2Staking.queryFilter(
     WithdrawEventFilter,
@@ -66,30 +63,47 @@ async function main(epoch, user) {
     toBlock
   );
 
-  console.log(
-    `Total ${withdrawEvents.length} Withdraw events found for user ${user} between blocks ${fromBlock} and ${toBlock}`
-  );
-  withdrawEvents.forEach((eventWithdraw, index) => {
+  withdrawEvents.forEach((event) => {
+    events.push({
+      type: "Withdraw",
+      amount: event.args.amount,
+      blockNumber: event.blockNumber,
+      transactionHash: event.transactionHash,
+    });
+  });
+
+  // Sort events by block number to process them in chronological order
+  events.sort((a, b) => a.blockNumber - b.blockNumber);
+
+  // Process events
+  events.forEach((event, index) => {
     console.log(`Event ${index + 1}:`);
-    console.log(`User: ${eventWithdraw.args.user}`);
-    console.log(`Amount Staked: ${eventWithdraw.args.amount.toString()}`);
-    console.log(`Block Number: ${eventWithdraw.blockNumber}`);
-    console.log(`Transaction Hash: ${eventWithdraw.transactionHash}`);
+    console.log(`Type: ${event.type}`);
+    console.log(`Amount: ${event.amount.toString()}`);
+    console.log(`Block Number: ${event.blockNumber}`);
+    console.log(`Transaction Hash: ${event.transactionHash}`);
     console.log("-------------------------------------------");
-    if (eventWithdraw.blockNumber >= lastDepositBlock) {
-      TotalDepositedAmount -= eventWithdraw.args.amount;
+
+    if (event.type === "Deposit") {
+      TotalDepositedAmount += BigInt(event.amount); // Convert to BigInt
+    } else if (event.type === "Withdraw") {
+      TotalDepositedAmount -= BigInt(event.amount); // Convert to BigInt
     }
   });
 
-  console.log("Total Amount Staked this epoch", TotalDepositedAmount);
+  console.log(
+    "Total Amount Staked this epoch",
+    TotalDepositedAmount.toString()
+  );
 }
 
-function getFromTimestamp(epoch) {
+function getFromAndToTimestamp(epoch) {
   let to = epochStart + epoch * epochDuration - 1;
   let from = to - epochDuration;
 
   return [from, to];
 }
+
 async function getBlockNumberFromTimestamp(timestamp, provider) {
   let earliestBlock = await provider.getBlock(0);
 
@@ -119,6 +133,7 @@ async function getBlockNumberFromTimestamp(timestamp, provider) {
   // Return the closest block number that is less than or equal to the given timestamp
   return low - 1;
 }
+
 main(18, userAddress)
   .then(() => process.exit(0))
   .catch((error) => {
