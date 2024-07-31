@@ -19,6 +19,8 @@ async function main(user) {
     `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
   );
   latestBlock = await provider.getBlock("latest");
+  
+  console.log("Initiating from and to with current Epoch");
 
   let epoch = await getCurrentEpoch();
   let fromTimestamp;
