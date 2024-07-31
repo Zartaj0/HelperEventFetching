@@ -1,5 +1,6 @@
 require("@nomicfoundation/hardhat-ethers");
 require("dotenv").config();
+const { ethers } = require("ethers");
 
 const abi = [
   "event Deposit(address indexed user, address indexed tokenAddress, uint256 amount)",
@@ -12,20 +13,23 @@ const userAddress = "0x6417Ef5291AEB0df83b31555Dc449d172bcc988A"; //Dynamic Valu
 const epochStart = 1689085800;
 const epochDuration = 1814400;
 let latestBlock;
-
-async function main(epoch, user) {
-  const provider = ethers.provider;
+let provider;
+async function main(user) {
+  provider = new ethers.JsonRpcProvider(
+    `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
+  );
   latestBlock = await provider.getBlock("latest");
 
+  let epoch = await getCurrentEpoch();
   let fromTimestamp;
   let toTimestamp;
+  let fromBlock;
+  let toBlock;
+
+  //get from and to block numbers and timestamps
   [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
 
-  // fromTimestamp = epochStart;//For testing from the very start
-
-  const fromBlock = await getBlockNumberFromTimestamp(fromTimestamp, provider);
-  const toBlock = await getBlockNumberFromTimestamp(toTimestamp, provider);
-  // toBlock = await ethers.provider.getBlockNumber(); // to fetch events till the latest block
+  [fromBlock, toBlock] = await getFromAndToBlockNumber(epoch);
 
   let UniV2Staking = new ethers.Contract(uniV2StakingAddress, abi, provider);
   console.log(
@@ -77,12 +81,6 @@ async function main(epoch, user) {
 
   // Process events
   events.forEach((event, index) => {
-    console.log(`Event ${index + 1}:`);
-    console.log(`Type: ${event.type}`);
-    console.log(`Amount: ${event.amount.toString()}`);
-    console.log(`Block Number: ${event.blockNumber}`);
-    console.log(`Transaction Hash: ${event.transactionHash}`);
-    console.log("-------------------------------------------");
 
     if (event.type === "Deposit") {
       TotalDepositedAmount += BigInt(event.amount); // Convert to BigInt
@@ -92,7 +90,8 @@ async function main(epoch, user) {
   });
 
   console.log(
-    "Total Amount Staked this epoch",
+    "Total Amount Staked in epoch:",
+    epoch,
     TotalDepositedAmount.toString()
   );
 }
@@ -104,14 +103,22 @@ function getFromAndToTimestamp(epoch) {
   return [from, to];
 }
 
-async function getBlockNumberFromTimestamp(timestamp, provider) {
-  let earliestBlock = await provider.getBlock(0);
+async function getFromAndToBlockNumber(epoch) {
+  [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
+  const fromBlock = await getBlockNumberFromTimestamp(fromTimestamp);
+  const toBlock = await getBlockNumberFromTimestamp(toTimestamp, provider);
+  return [fromBlock, toBlock];
+}
 
-  if (
-    timestamp < earliestBlock.timestamp ||
-    timestamp > latestBlock.timestamp
-  ) {
-    throw new Error("Timestamp is out of range.");
+async function getCurrentEpoch() {
+  let epoch = (latestBlock.timestamp - epochStart) / epochDuration + 1;
+  return ~~epoch;
+}
+
+async function getBlockNumberFromTimestamp(timestamp) {
+  let earliestBlock = await provider.getBlock(0);
+  if (timestamp > latestBlock.timestamp) {
+    timestamp = latestBlock.timestamp;
   }
 
   let low = earliestBlock.number;
@@ -134,7 +141,7 @@ async function getBlockNumberFromTimestamp(timestamp, provider) {
   return low - 1;
 }
 
-main(18, userAddress)
+main(userAddress)
   .then(() => process.exit(0))
   .catch((error) => {
     console.error(error);
