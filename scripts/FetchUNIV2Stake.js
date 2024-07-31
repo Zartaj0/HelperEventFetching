@@ -96,6 +96,7 @@ async function main(user) {
   );
 }
 
+//To get from and to Timestamp for a given epoch
 function getFromAndToTimestamp(epoch) {
   let to = epochStart + epoch * epochDuration - 1;
   let from = to - epochDuration;
@@ -103,6 +104,7 @@ function getFromAndToTimestamp(epoch) {
   return [from, to];
 }
 
+//To get the block number in correspondance to the Timestamps for a given epoch
 async function getFromAndToBlockNumber(epoch) {
   [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
   const fromBlock = await getBlockNumberFromTimestamp(fromTimestamp);
@@ -110,11 +112,14 @@ async function getFromAndToBlockNumber(epoch) {
   return [fromBlock, toBlock];
 }
 
+
+//To get the cuurent epoch 
 async function getCurrentEpoch() {
   let epoch = (latestBlock.timestamp - epochStart) / epochDuration + 1;
   return ~~epoch;
 }
 
+// To find out the block number given the timestamp
 async function getBlockNumberFromTimestamp(timestamp) {
   let earliestBlock = await provider.getBlock(0);
   if (timestamp > latestBlock.timestamp) {
