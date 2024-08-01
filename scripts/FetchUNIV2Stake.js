@@ -12,26 +12,21 @@ const userAddress = "0x6417Ef5291AEB0df83b31555Dc449d172bcc988A"; //Dynamic Valu
 
 const epochStart = 1689085800;
 const epochDuration = 1814400;
-let latestBlock;
+
 let provider;
+
 async function main(user) {
   provider = new ethers.JsonRpcProvider(
     `https://mainnet.infura.io/v3/${process.env.INFURA_PROJECT_ID}`
   );
-  latestBlock = await provider.getBlock("latest");
   
+  let latestBlock = await provider.getBlock("latest");
+
   console.log("Initiating from and to with current Epoch");
 
-  let epoch = await getCurrentEpoch();
-  let fromTimestamp;
-  let toTimestamp;
-  let fromBlock;
-  let toBlock;
-
-  //get from and to block numbers and timestamps
-  [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
-
-  [fromBlock, toBlock] = await getFromAndToBlockNumber(epoch);
+  let epoch = getCurrentEpoch(latestBlock.timestamp);
+  let [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
+  let [fromBlock, toBlock] = await getFromAndToBlockNumber(fromTimestamp, toTimestamp);
 
   let UniV2Staking = new ethers.Contract(uniV2StakingAddress, abi, provider);
   console.log(
@@ -44,50 +39,21 @@ async function main(user) {
   let TotalDepositedAmount = BigInt(0); // Initialize as BigInt
   let events = [];
 
-  // Fetch Deposit events
-  let depositEventFilter = UniV2Staking.filters.Deposit(user);
-  let depositEvents = await UniV2Staking.queryFilter(
-    depositEventFilter,
-    fromBlock,
-    toBlock
-  );
+  // Fetch Deposit and Withdraw events in parallel
+  let [depositEvents, withdrawEvents] = await Promise.all([
+    UniV2Staking.queryFilter(UniV2Staking.filters.Deposit(user), fromBlock, toBlock),
+    UniV2Staking.queryFilter(UniV2Staking.filters.Withdraw(user), fromBlock, toBlock),
+  ]);
 
-  depositEvents.forEach((event) => {
-    events.push({
-      type: "Deposit",
-      amount: event.args.amount,
-      blockNumber: event.blockNumber,
-      transactionHash: event.transactionHash,
-    });
-  });
-
-  // Fetch Withdraw events
-  let WithdrawEventFilter = UniV2Staking.filters.Withdraw(user);
-  let withdrawEvents = await UniV2Staking.queryFilter(
-    WithdrawEventFilter,
-    fromBlock,
-    toBlock
-  );
-
-  withdrawEvents.forEach((event) => {
-    events.push({
-      type: "Withdraw",
-      amount: event.args.amount,
-      blockNumber: event.blockNumber,
-      transactionHash: event.transactionHash,
-    });
-  });
-
-  // Sort events by block number to process them in chronological order
-  events.sort((a, b) => a.blockNumber - b.blockNumber);
+  // Combine events and sort them
+  events = [...depositEvents, ...withdrawEvents].sort((a, b) => a.blockNumber - b.blockNumber);
 
   // Process events
-  events.forEach((event, index) => {
-
-    if (event.type === "Deposit") {
-      TotalDepositedAmount += BigInt(event.amount); // Convert to BigInt
-    } else if (event.type === "Withdraw") {
-      TotalDepositedAmount -= BigInt(event.amount); // Convert to BigInt
+  events.forEach((event) => {
+    if (event.event === "Deposit") {
+      TotalDepositedAmount += BigInt(event.args.amount);
+    } else if (event.event === "Withdraw") {
+      TotalDepositedAmount -= BigInt(event.args.amount);
     }
   });
 
@@ -98,37 +64,35 @@ async function main(user) {
   );
 }
 
-//To get from and to Timestamp for a given epoch
+// Get from and to timestamp for a given epoch
 function getFromAndToTimestamp(epoch) {
   let to = epochStart + epoch * epochDuration - 1;
   let from = to - epochDuration;
-
   return [from, to];
 }
 
-//To get the block number in correspondance to the Timestamps for a given epoch
-async function getFromAndToBlockNumber(epoch) {
-  [fromTimestamp, toTimestamp] = getFromAndToTimestamp(epoch);
-  const fromBlock = await getBlockNumberFromTimestamp(fromTimestamp);
-  const toBlock = await getBlockNumberFromTimestamp(toTimestamp, provider);
+// Get the block number in correspondence to the timestamps for a given epoch
+async function getFromAndToBlockNumber(fromTimestamp, toTimestamp) {
+  let [fromBlock, toBlock] = await Promise.all([
+    getBlockNumberFromTimestamp(fromTimestamp),
+    getBlockNumberFromTimestamp(toTimestamp),
+  ]);
   return [fromBlock, toBlock];
 }
 
-
-//To get the cuurent epoch 
-async function getCurrentEpoch() {
-  let epoch = (latestBlock.timestamp - epochStart) / epochDuration + 1;
-  return ~~epoch;
+// Get the current epoch
+function getCurrentEpoch(currentTimestamp) {
+  return Math.floor((currentTimestamp - epochStart) / epochDuration + 1);
 }
 
-// To find out the block number given the timestamp
+// Find out the block number given the timestamp
 async function getBlockNumberFromTimestamp(timestamp) {
-  let earliestBlock = await provider.getBlock(0);
+  let latestBlock = await provider.getBlock("latest");
   if (timestamp > latestBlock.timestamp) {
     timestamp = latestBlock.timestamp;
   }
 
-  let low = earliestBlock.number;
+  let low = 0;
   let high = latestBlock.number;
 
   while (low <= high) {
